@@ -1,0 +1,43 @@
+---
+# tasks file for build_push_docker_image
+- name: Delete content in directory
+  file:
+    state: absent
+    path: /home/myroslav/final_task/final_pet/
+
+- name: Clone Git Repo
+  ansible.builtin.git:
+    repo: https://github.com/myroslavlevchyk/4pet.git
+    dest: /home/myroslav/final_task/final_pet
+    single_branch: yes
+    version: feature
+
+- name: Hadolint
+  command: hadolint /home/myroslav/final_task/final/Dockerfile
+
+- name: MVN Package
+  command: chdir=/home/myroslav/final_task/final_pet ./mvnw package  
+
+- name: SonarQube
+  command: chdir=/home/myroslav/final_task/final_pet ./mvnw -e clean verify sonar:sonar -Dsonar.host.url=http://localhost:9000 -Dsonar.login="{{ SONAR_USER }}" -Dsonar.password="{{ SONAR_PASSWORD }}"     
+   
+- name: Build Docker container image (latest)
+  command: chdir=/home/myroslav/final_task/final_pet docker build -t myroslavlevchyk/petclinic:latest -f /home/myroslav/final_task/final/Dockerfile .        
+
+- name: Tag ("{{ BUILD_VERSION }}") Docker container image
+  command: chdir=/home/myroslav/final_task/final_pet docker build -t myroslavlevchyk/petclinic:"{{ BUILD_VERSION }}" -f /home/myroslav/final_task/final/Dockerfile .        
+
+- name: Log into DockerHub
+  community.docker.docker_login:
+    username: "{{ DOCKER_USERNAME }}"
+    password: "{{ DOCKER_PASSWORD }}"
+
+- name: PUSH Docker container image (latest)
+  command: docker push myroslavlevchyk/petclinic:latest
+
+- name: PUSH Docker container image ("{{ BUILD_VERSION }}")
+  command: docker push myroslavlevchyk/petclinic:"{{ BUILD_VERSION }}"
+
+- name: Log out of DockerHub
+  community.docker.docker_login:
+    state: absent       
